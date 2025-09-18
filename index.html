@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <!-- Son dependencias  -->
+    <link rel="stylesheet" href="public/css/bootstrap.css">
+    <script src="public/js/bootstrap.js"></script>
+    <script src="public/js/pooper.js"></script>
+    <script src="public/js/leader-line.js"></script>
+    
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row justify-content-around">
+            <div class="col-12 text-center">
+                <h3>Arbol de expresion</h3>
+                <hr>
+            </div>
+            <div class="col-md-4 text-center">
+                <label for="expresion"> Ingresa una operacion matematica simple</label>
+                <input type="text" class="form-control mb-3" id="expresion">
+
+                <button id="btn_generar" class="btn btn-primary w-100 mb-3">Generar arbol </button>
+            </div>
+            <div class="col-4">
+                <div id="contenido_arbol" class="row justify-content-around border border-primary" style="height: 200px;">
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- para que no se ejecute antes de tiempo -->
+    <script src="public/js/main.js"></script>
+
+    
+    
+</body>
+</html>
