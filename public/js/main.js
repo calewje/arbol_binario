@@ -1,100 +1,379 @@
-// Validación de caracteres (sin 'g' para evitar state)
-const validacion = /^[\d+\-*/() \t]+$/;
+/* 
+//                        + ---> aplica una operacion UNA O MÁS VECES 
+//                                          gm ---> global macht
+const validacion = /^[0-9]+[+\-/*]{1}[0-9]+$/;
+const validacion2 = /^[0-9]+[+\-/*][(][0-9]+[+\-/*]{1}[0-9]+[)]+$/;
+const validacion3 = /^[(][0-9]+[+\-/*]{1}[0-9]+[)]+[+\-/*]{1}[0-9]+$/;
+const validacion5 = /^[(][0-9]+[+\-/*]{1}[0-9]+[)]+[+\-/*]{1}[(][0-9]+[+\-/*]{1}[0-9]+[)]/;
+*/
 
-const btn1  = document.getElementById("btn_generar");
-const arbol = document.getElementById("contenido_arbol");
+const validacionGeneral = /^[0-9a-zA-Z+\-*/() ]+$/;
 
-const estilos = { color:'#e22f2fff', outline:false, endPlugOutline:false, endPlugSize:1, startPlug:'behind', endPlug:'behind', path:'straight', size:2 };
+//Se guardara todo lo que tenga el boton
+let btn1 = document.getElementById("btn_generar");
+let arbol = document.getElementById("contenido_arbol");
+ 
 
-const nodo  = (v,id)=>`<div class='col-2 align-self-end'><span id="${id}" class='btn btn-success rounded-circle'>${v}<span></div>`;
-const nodo2 = (v,id)=>`<div class='col-2'><span id="${id}" class='btn btn-primary rounded-circle'>${v}<span></div>`;
-
-const pos=(id,x,y)=>{const s=document.getElementById(id).parentElement; s.style.position='absolute'; s.style.left=x+'px'; s.style.top=y+'px';};
-const limpia=()=>{(window.__lines||[]).forEach(l=>l.remove()); window.__lines=[];};
-const prec=o=> (o==='+'||o==='-')?1:(o==='*'||o==='/')?2:0;
-const isNum=t=>/^\d+$/.test(t), isOp=t=>/[+\-*/]/.test(t);
-
-function tokens(expr){
-  const t=(expr.replace(/\s+/g,'').match(/(\d+|\+|\-|\*|\/|\(|\))/g)||[]), out=[];
-  for(let i=0;i<t.length;i++){
-    const cur=t[i], prev=out[out.length-1];
-    const unario=(cur==='+'||cur==='-')&&(i===0||prev==='('||isOp(prev));
-    if(unario && cur==='+') continue;
-    if(unario && cur==='-') out.push('0','-'); else out.push(cur);
-  }
-  return out;
+const estilos ={
+    color:'#98f1eaff',
+    outline: false,
+    endPlugOutline:false,
+    endPlugSize: 1,
+    startPlug: 'behind',
+    endPlug: 'behind'
 }
 
-function parensOK(tk){
-  let d=0; for(const t of tk){ if(t==='(') d++; else if(t===')' && --d<0) return false; } return d===0;
+const nodo = (valor,id)=>{
+    return `<div class='col-2 align-self-end'><span id="${id}" class='btn btn-success rounded-circle'>${valor}</span></div>`
 }
-
-function topLevelOneOp(tk){
-  let depth=0, count=0;
-  for(const t of tk){
-    if(t==='(') depth++;
-    else if(t===')') depth--;
-    else if(depth===0 && isOp(t) && ++count>1) return false;
-  }
-  return count>=1;
+const nodo2  = (valor,id)=>{ 
+    return  `<div class='col-3'><span id="${id}" class='btn btn-primary rounded-circle'>${valor}<span></div>`
 }
+/* const nodo3 = (valor,id)=>{
+    return `<div class='col-2 align-self-end'><span id="${id}" class='btn btn-success rounded-circle'>${valor}</span></div>`
+}  */
+//"<div class='row justify-content-around'>"+"<div class='col-2 text-center'>|</div>"+"<div class='col-3 text-center'></div>"+"<div class='col-2 text-center'>|</div>"+"</div>"
+const tokenizar = (expresion) => {
+    return expresion.match(/[a-zA-Z]+|\d+|[()+\-*/]/g) || [];
+};
 
-function secuenciaOK(tk){
-  if(!tk.length || isOp(tk[0]) || isOp(tk.at(-1))) return false;
-  for(let i=0;i<tk.length-1;i++){
-    const a=tk[i], b=tk[i+1];
-    if( (isNum(a)&&(isNum(b)||b==='(')) || (a===')'&&(isNum(b)||b==='(')) ) return false;
-    if( (isOp(a)&&(isOp(b)||b===')')) || (a==='('&&(isOp(b)||b===')')) ) return false;
-  }
-  return true;
-}
+const construirArbol = (tokens) => {
+    let pilaOperandos = [];
+    let pilaOperadores = [];
 
-function aRPN(tk){
-  const out=[], ops=[];
-  for(const t of tk){
-    if(isNum(t)) out.push(t);
-    else if(isOp(t)){ while(ops.length&&isOp(ops.at(-1))&&prec(ops.at(-1))>=prec(t)) out.push(ops.pop()); ops.push(t); }
-    else if(t==='(') ops.push(t);
-    else { while(ops.length&&ops.at(-1)!=='(') out.push(ops.pop()); if(!ops.length) throw Error('Paréntesis'); ops.pop(); }
-  }
-  while(ops.length){ const top=ops.pop(); if(top==='('||top===')') throw Error('Paréntesis'); out.push(top); }
-  return out;
-}
+    const prioridad = { "+": 1, "-": 1, "*": 2, "/": 2 };
 
-function rpn2ast(r){
-  const s=[];
-  for(const t of r){
-    if(isNum(t)) s.push({t:'n',v:t,id:'n'+Math.random()});
-    else{ const b=s.pop(), a=s.pop(); if(!a||!b) throw Error('Expresión'); s.push({t:'o',v:t,id:'n'+Math.random(),l:a,r:b}); }
-  }
-  if(s.length!==1) throw Error('Expresión'); return s[0];
-}
+    const aplicarOperador = () => {
+        let operador = pilaOperadores.pop();
+        let derecha = pilaOperandos.pop();
+        let izquierda = pilaOperandos.pop();
+        pilaOperandos.push({ valor: operador, izq: izquierda, der: derecha });
+    };
 
-function ubicar(root){
-  let x=0; const X=60,Y=50,W=arbol.clientWidth||800,C=W/2;
-  (function dfs(n,d=0){ if(!n) return; if(n.t==='o') dfs(n.l,d+1); n.px=C+(x++-3)*X; n.py=20+d*Y; if(n.t==='o') dfs(n.r,d+1); })(root);
-}
-
-function dibujar(n){
-  arbol.innerHTML += (n.t==='n'?nodo:nodo2)(n.v,n.id);
-  pos(n.id,n.px,n.py);
-  if(n.t==='o'){
-    dibujar(n.l); dibujar(n.r);
-    window.__lines.push(new LeaderLine(document.getElementById(n.id),document.getElementById(n.l.id),estilos));
-    window.__lines.push(new LeaderLine(document.getElementById(n.id),document.getElementById(n.r.id),estilos));
-  }
-}
-
-btn1.addEventListener("click", ()=>{
-  const expr=(document.getElementById("expresion").value||'').trim();
-  if(!validacion.test(expr)) return alert("Expresión inválida: caracteres no permitidos.");
-  try{
-    const tk=tokens(expr);
-    if(!parensOK(tk)) return alert("Paréntesis desbalanceados.");
-    if(!secuenciaOK(tk)) return alert("Secuencia inválida de tokens.");
-    if(!topLevelOneOp(tk)) return alert("No se permiten cadenas de operadores al mismo nivel. Usa paréntesis.");
-    limpia(); arbol.innerHTML='';
-    const ast=rpn2ast(aRPN(tk));
-    ubicar(ast); dibujar(ast);
-  }catch(e){ console.error(e); alert("Error: "+e.message); }
+    tokens.forEach(t => {
+    if (/^[a-zA-Z0-9]+$/.test(t)) {  // acepta números y variables
+        pilaOperandos.push({ valor: t });
+    } else if (t === "(") {
+        pilaOperadores.push(t);
+    } else if (t === ")") {
+        while (pilaOperadores[pilaOperadores.length - 1] !== "(") {
+            aplicarOperador();
+        }
+        pilaOperadores.pop();
+    } else {
+        while (pilaOperadores.length &&
+            prioridad[pilaOperadores[pilaOperadores.length - 1]] >= prioridad[t]) {
+            aplicarOperador();
+        }
+        pilaOperadores.push(t);
+    }
 });
+
+    while (pilaOperadores.length) {
+        aplicarOperador();
+    }
+
+    return pilaOperandos[0]; // raíz del árbol
+};
+
+let idCounter = 0;
+
+const dibujarArbol = (nodoActual, contenedorId) => {
+    if (!nodoActual) return null;
+
+    const nodoId = `n${idCounter++}`;
+
+    // Crear contenedor para este subárbol
+    let contenedor = document.createElement("div");
+    contenedor.className = "d-flex flex-column align-items-center m-3";
+
+    // Nodo actual
+    let nodoHTML = document.createElement("div");
+    nodoHTML.innerHTML = nodoActual.izq || nodoActual.der
+        ? nodo2(nodoActual.valor, nodoId)
+        : nodo(nodoActual.valor, nodoId);
+
+    contenedor.appendChild(nodoHTML);
+
+    // Si tiene hijos → fila para hijos
+    if (nodoActual.izq || nodoActual.der) {
+        let filaHijos = document.createElement("div");
+        filaHijos.className = "d-flex justify-content-around w-100 m-3";
+
+        if (nodoActual.izq) filaHijos.appendChild(dibujarArbol(nodoActual.izq, nodoId));
+        if (nodoActual.der) filaHijos.appendChild(dibujarArbol(nodoActual.der, nodoId));
+
+        contenedor.appendChild(filaHijos);
+    }
+
+    // 🚨 OJO: conectar al padre solo después de que esté insertado en el DOM
+    setTimeout(() => {
+        if (contenedorId) {
+            new LeaderLine(
+                document.getElementById(contenedorId),
+                document.getElementById(nodoId),
+                estilos
+            );
+        }
+    }, 0);
+
+    return contenedor;
+};
+
+
+function preOrden(nodo) {
+    if (!nodo) return [];
+    return [nodo.valor].concat(preOrden(nodo.izq), preOrden(nodo.der));
+}
+
+function inOrden(nodo) {
+    if (!nodo) return [];
+    return inOrden(nodo.izq).concat([nodo.valor], inOrden(nodo.der));
+}
+
+function postOrden(nodo) {
+    if (!nodo) return [];
+    return postOrden(nodo.izq).concat(postOrden(nodo.der), [nodo.valor]);
+}
+
+
+    btn1.addEventListener("click",()=>{
+        let expresion = document.getElementById("expresion").value;
+        // validara la expresis
+
+         if (!validacionGeneral.test(expresion)) {
+        alert("Expresión inválida.");
+        return;
+    }
+
+    arbol.innerHTML = ""; // limpiar antes
+    idCounter = 0;
+
+        /* if(validacion.test(expresion)){
+
+        let hojas = expresion.split(/[+-/*]/);
+        let operador = expresion.split(/[0-9]/);
+        let operador2 = operador.filter(Boolean);
+        console.log(operador2);
+
+            arbol.innerHTML = nodo(hojas[0],"a");
+            arbol.innerHTML += nodo2(operador2,"o");
+            arbol.innerHTML += nodo(hojas[1],"b");
+
+        new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("a"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("b"),
+                estilos
+            )
+
+        }else if(validacion2.test(expresion)){
+            //let hojas2 = expresion.split(/[(][+-/*]/)
+            //                      split() ----> nos ayuda a combertir de una cadena a un arreglo  
+            //                              --> se le puede pasar una expresion regular
+            let hojas = expresion.split(/[+-/*]/);
+            let operador1 = expresion.split(/[0-9]/);
+            let operador3 = operador1.filter(Boolean);
+            let hojas2 = hojas[1].replace("(","");
+            let hojas3 = hojas[2].replace(")","");
+            console.log(hojas);
+            console.log(operador3);
+            
+            arbol.innerHTML = nodo(hojas[0],"c");
+            arbol.innerHTML += nodo2(operador3[0].replace("(",""),"o");
+            //arbol.innerHTML += "<div class='col-2 text-center'></div>";
+            arbol.innerHTML += nodo(operador3[1],"o2");
+            arbol.innerHTML += `<div class='row'></div>`;
+            
+            arbol.innerHTML += `<div class='col-2'></div><div class='col-2'></div><div class='col-2'></div>`;
+            arbol.innerHTML += nodo3(hojas2,"a");
+            arbol.innerHTML += nodo3(hojas3,"b");
+
+            
+
+            //arbol.innerHTML += nodo2(hojas2[1],"c");
+
+            
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("o2"),
+                estilos
+            )
+
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("c"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o2"),
+                document.getElementById("a"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o2"),
+                document.getElementById("b"),
+                estilos
+            )
+            //alert("Hojas: "+hojas + "\n" + "Operador: " + operador);
+
+            //alert("Cumple");
+        } else if(validacion3.test(expresion)){
+            //let hojas2 = expresion.split(/[(][+-/*]/)
+            //                      split() ----> nos ayuda a combertir de una cadena a un arreglo  
+            //                              --> se le puede pasar una expresion regular
+            let hojas = expresion.split(/[)]+[+-/*]/);
+            let operador1 = expresion.split(/[0-9]/);
+            let operador3 = operador1.filter(Boolean);
+            let operador2 = operador3[2].replace(")","");
+            let hojas2 = hojas[0].split(/[+-/*]/);
+            let hojas3 = hojas2[0].replace("(","");
+            console.log(operador3);
+            
+            arbol.innerHTML = nodo(operador3[1],"o2");
+            arbol.innerHTML += nodo2(operador2,"o");
+            //arbol.innerHTML += "<div class='col-2 text-center'></div>";
+            arbol.innerHTML += nodo(hojas[1],"c");
+            arbol.innerHTML += `<div class='row'></div>`;
+
+            arbol.innerHTML += nodo3(hojas3,"a");
+            arbol.innerHTML += nodo3(hojas2[1],"b");
+            arbol.innerHTML += `<div class='col-2'></div><div class='col-2'></div><div class='col-2'></div>`;
+
+            
+
+            //arbol.innerHTML += nodo2(hojas2[1],"c");
+
+            
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("o2"),
+                estilos
+            )
+
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("c"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o2"),
+                document.getElementById("a"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o2"),
+                document.getElementById("b"),
+                estilos
+            )
+            //alert("Hojas: "+hojas + "\n" + "Operador: " + operador);
+
+            //alert("Cumple");
+        }else if(validacion5.test(expresion)){
+        let hojas = expresion.split(/[)]+[+-/*]/);
+            let operador1 = expresion.split(/[0-9]/);
+            let operador3 = operador1.filter(Boolean);
+            let operador2 = operador3[2].replace("(","");
+            let hojas2 = hojas[0].split(/[+-/*]/);
+            let hojas3 = hojas[1].split(/[+-/*]/);
+            console.log(operador3);
+            //.filter(Boolean)
+            arbol.innerHTML = nodo(operador3[1],"o2");
+            arbol.innerHTML += nodo2(operador2.replace(")",""),"o");
+            arbol.innerHTML += nodo(operador3[3],"o3");
+            arbol.innerHTML += `<div class='row'></div>`;
+
+            arbol.innerHTML += nodo3(hojas2[0].replace("(",""),"a");
+            arbol.innerHTML += nodo3(hojas2[1],"b");
+            //arbol.innerHTML += `<div class='col-1'></div><div class='col-2'></div><div class='col-2'></div>`;
+            arbol.innerHTML += nodo3(hojas3[0].replace("(",""),"c");
+            arbol.innerHTML += nodo3(hojas3[1].replace(")",""),"d");
+
+ 
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("o2"),
+                estilos
+            )
+
+            new LeaderLine(
+                document.getElementById("o"),
+                document.getElementById("o3"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o2"),
+                document.getElementById("a"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o2"),
+                document.getElementById("b"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o3"),
+                document.getElementById("c"),
+                estilos
+            )
+            new LeaderLine(
+                document.getElementById("o3"),
+                document.getElementById("d"),
+                estilos
+            )
+        }  else{
+            alert("no cumple");
+        }
+        //alert("Boton funcionando" + expresion); */
+    // Tokenizar y construir árbol
+    
+    let tokens = tokenizar(expresion);
+    let raiz = construirArbol(tokens);
+
+    let subarbol = dibujarArbol(raiz, null);
+    arbol.appendChild(subarbol);
+
+    console.log("Tokens:", tokens);
+    console.log("Árbol:", raiz);
+
+    let pre = preOrden(raiz).join(" ");
+    let ino = inOrden(raiz).join(" ");
+    let post = postOrden(raiz).join(" ");
+
+    document.getElementById("recorridos").innerHTML = `
+        <h5>Árbol Binario</h5>
+        <p><strong>Pre-orden:</strong> ${pre}</p>
+        <p><strong>In-orden:</strong> ${ino}</p>
+        <p><strong>Post-orden:</strong> ${post}</p>
+    `;
+    // Usamos map para debug y mostrar tokens
+    //tokens.map((t, i) => console.log(`Token ${i}: ${t}`));
+
+    //Dibujar el árbol en el contenedor
+    //dibujarArbol(raiz, null); 
+
+    
+    })
+
+
+
+console.log(btn1);
+
+
+
+
+
+// Arbol binario
+// pre-orden : A + B
+// pos-orden : + A B
+// iorden     : A B +
+
+
+
+
+
+
