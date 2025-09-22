@@ -106,7 +106,7 @@ const dibujarArbol = (nodoActual, contenedorId) => {
         contenedor.appendChild(filaHijos);
     }
 
-    // 🚨 OJO: conectar al padre solo después de que esté insertado en el DOM
+   
     setTimeout(() => {
         if (contenedorId) {
             new LeaderLine(
